@@ -10,7 +10,7 @@ using System.Security.Permissions;
 
 namespace LiveBoardViewer;
 
-[BepInPlugin("greatgamedota.liveboardviewer", "Live Board Viewer for Bingo Mode", "0.1.0")]
+[BepInPlugin("greatgamedota.liveboardviewer", "Live Board Viewer", "0.2.0")]
 public class LiveBoardViewer : BaseUnityPlugin
 {
     public static WebSocketConnection wsConnection;

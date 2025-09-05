@@ -48,8 +48,10 @@ public static class BingoModeHooks
                     if (!LiveBoardViewer.wsConnection.IsConnected)
                         LiveBoardViewer.wsConnection.ConnectAsync().Wait();
 
+                    var name = SteamFriends.GetFriendPersonaName((CSteamID)GetSteamID?.Invoke(selfIdentity, null));
+
                     string state = BingoMode.BingoHooks.GlobalBoard.GetBingoState();
-                    LiveBoardViewer.wsConnection.SendAsync(BingoMode.BingoHooks.GlobalBoard.ToString() + ";;" + state.Replace('3', '1') + ";;" + GetSteamID64?.Invoke(selfIdentity, null) + ";;" + team + ";;" + data[0]).Wait();
+                    LiveBoardViewer.wsConnection.SendAsync(BingoMode.BingoHooks.GlobalBoard.ToString() + ";;" + state.Replace('3', '1') + ";;" + name + ";;" + team + ";;" + data[0]).Wait();
                     // await wsConnection.DisconnectAsync();
                 }
             }
@@ -78,11 +80,16 @@ public static class BingoModeHooks
             var GetSteamID64 = selfIdentity?
                 .GetType()?
                 .GetMethod("GetSteamID64", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var GetSteamID = selfIdentity?
+                .GetType()?
+                .GetMethod("GetSteamID", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             var team = SteamTest?
                 .GetField("team", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?
                 .GetValue(null);
 
-            LiveBoardViewer.wsConnection.SendAsync(BingoMode.BingoHooks.GlobalBoard.ToString() + ";;" + state.Replace('3', '1') + ";;" + GetSteamID64?.Invoke(selfIdentity, null) + ";;" + team).Wait();
+            var name = SteamFriends.GetFriendPersonaName((CSteamID)GetSteamID?.Invoke(selfIdentity, null));
+
+            LiveBoardViewer.wsConnection.SendAsync(BingoMode.BingoHooks.GlobalBoard.ToString() + ";;" + state.Replace('3', '1') + ";;" + name + ";;" + team).Wait();
             // wsConnection.DisconnectAsync();
         });
 
