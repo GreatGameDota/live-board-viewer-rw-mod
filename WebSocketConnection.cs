@@ -24,14 +24,14 @@ public class WebSocketConnection : IDisposable
             webSocket = new ClientWebSocket();
             cancellationTokenSource = new CancellationTokenSource(10000);
 
-            LiveBoardViewer.logger.LogInfo($"Attempting to connect to {ServerUrl}...");
+            // LiveBoardViewer.logger.LogInfo($"Attempting to connect to {ServerUrl}...");
 
             await webSocket.ConnectAsync(new Uri(ServerUrl), cancellationTokenSource.Token);
 
             isConnected = true;
             reconnectAttempts = 0;
 
-            LiveBoardViewer.logger.LogInfo("WebSocket connected successfully");
+            // LiveBoardViewer.logger.LogInfo("WebSocket connected successfully");
         }
         catch (Exception ex)
         {
@@ -60,7 +60,7 @@ public class WebSocketConnection : IDisposable
                 cancellationTokenSource.Token
             );
 
-            LiveBoardViewer.logger.LogInfo($"Data sent: {data.Length} bytes");
+            // LiveBoardViewer.logger.LogInfo($"Data sent: {data.Length} bytes");
         }
         catch (Exception ex)
         {

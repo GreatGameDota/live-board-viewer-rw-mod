@@ -16,6 +16,7 @@ public class LiveBoardViewer : BaseUnityPlugin
     public static WebSocketConnection wsConnection;
     internal static ManualLogSource logger;
     private static bool init;
+    public static RainWorld game;
 
     public void OnEnable()
     {
@@ -35,6 +36,7 @@ public class LiveBoardViewer : BaseUnityPlugin
         if (init) return;
 
         init = true;
+        game = self;
         try
         {
             wsConnection = new();
