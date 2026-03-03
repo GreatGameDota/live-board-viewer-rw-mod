@@ -56,14 +56,24 @@ public static class BingoModeHooks
 
     public static void On_OnChallengeCompleted(Action<BingoMode.BingoChallenges.BingoChallenge, int> orig, BingoMode.BingoChallenges.BingoChallenge self, int team)
     {
+        // BingoMode.BingoSteamworks.SteamTest is an internal class
+        var SteamTest = AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(x => x.GetTypes())
+            .Where(x => x.IsClass && x.Namespace == "BingoMode.BingoSteamworks")
+            .FirstOrDefault(x => x.Name == "SteamTest");
+        var _team = SteamTest?
+            .GetField("team", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?
+            .GetValue(null);
+        if ((int)_team == team)
+        {
+            LiveBoardViewer.logger.LogInfo($"Completed goals: {++completedGoals}");
+        }
+
         orig(self, team);
-        LiveBoardViewer.logger.LogInfo($"Completed goals: {++completedGoals}");
     }
 
     public static void On_OnChallengeFailed(Action<BingoMode.BingoChallenges.BingoChallenge, int> orig, BingoMode.BingoChallenges.BingoChallenge self, int team)
     {
-        orig(self, team);
-
         // BingoMode.BingoSteamworks.SteamTest is an internal class
         var SteamTest = AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(x => x.GetTypes())
@@ -76,6 +86,8 @@ public static class BingoModeHooks
         {
             LiveBoardViewer.logger.LogInfo($"Goal failed: {--completedGoals}");
         }
+
+        orig(self, team);
     }
 
     public static void On_InnerWorkings_MessageReceived(Action<string> orig, string _message)
@@ -127,32 +139,11 @@ public static class BingoModeHooks
                             else
                             {
                                 // bingoChallenge.OnChallengeCompleted(num3);
-                                completedGoals--;
+                                if (num3 == (int)team)
+                                    completedGoals--;
                             }
                         }
                     }
-                }
-            }
-        }
-        else if (c <= 'U')
-        {
-        }
-        else if (c != '^')
-        {
-        }
-        else
-        {
-            if (array.Length == 3)
-            {
-                int num4 = int.Parse(array[0], NumberStyles.Any);
-                int num5 = int.Parse(array[1], NumberStyles.Any);
-                int _team = int.Parse(array[2], NumberStyles.Any);
-                if (num4 != -1 && num5 != -1)
-                {
-                    if ((int)team == _team)
-                        completedGoals++;
-                    // (BingoHooks.GlobalBoard.challengeGrid[num4, num5] as BingoChallenge).OnChallengeFailed(team);
-                    // SteamFinal.BroadcastCurrentBoardState();
                 }
             }
         }
