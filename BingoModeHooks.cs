@@ -9,6 +9,7 @@ namespace LiveBoardViewer;
 public static class BingoModeHooks
 {
     public static int completedGoals = 0;
+    public static string cachedTime = "";
 
     public static Type? _steamTestType;
     public static Type? SteamTestType => _steamTestType ??= AppDomain.CurrentDomain.GetAssemblies()
@@ -60,14 +61,18 @@ public static class BingoModeHooks
         var team = GetSteamTestField("team");
 
         var name = SteamFriends.GetFriendPersonaName((CSteamID)GetSteamID?.Invoke(selfIdentity, null));
-        RainWorldGame _game = (RainWorldGame)LiveBoardViewer.game.processManager.currentMainLoop;
-        SpeedRunTimer.CampaignTimeTracker campaignTimeTracker = SpeedRunTimer.GetCampaignTimeTracker(_game.GetStorySession.saveStateNumber);
+        RainWorldGame? _game = LiveBoardViewer.game.processManager.currentMainLoop as RainWorldGame;
+        if (_game != null)
+        {
+            SpeedRunTimer.CampaignTimeTracker campaignTimeTracker = SpeedRunTimer.GetCampaignTimeTracker(_game.GetStorySession.saveStateNumber);
+            cachedTime = campaignTimeTracker?.TotalFreeTimeSpan.GetIGTFormat(true);
+        }
 
         return BingoMode.BingoHooks.GlobalBoard.ToString() + ";;" +
                state.Replace('3', '1') + ";;" +
                name + ";;" +
                team + ";;" +
-               campaignTimeTracker?.TotalFreeTimeSpan.GetIGTFormat(true) + ";;" +
+               cachedTime + ";;" +
                completedGoals;
     }
 
@@ -152,7 +157,11 @@ public static class BingoModeHooks
         var GetSteamID = selfIdentity?.GetType()?.GetMethod("GetSteamID", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
         bool isSelf = receiver.GetSteamID() == (CSteamID?)GetSteamID?.Invoke(selfIdentity, null);
-        bool isHost = (ulong?)GetSteamID64?.Invoke(selfIdentity, null) == BingoMode.BingoSteamworks.SteamFinal.GetHost().GetSteamID64();
+        bool isHost = false;
+        if (BingoMode.BingoData.BingoSaves.ContainsKey(Expedition.ExpeditionData.slugcatPlayer))
+        {
+            isHost = (ulong?)GetSteamID64?.Invoke(selfIdentity, null) == BingoMode.BingoSteamworks.SteamFinal.GetHost().GetSteamID64();
+        }
 
         if (!isSelf && !isHost)
         {
