@@ -10,7 +10,7 @@ using System.Security.Permissions;
 
 namespace LiveBoardViewer;
 
-[BepInPlugin("greatgamedota.liveboardviewer", "Live Board Viewer", "0.3.2")]
+[BepInPlugin("greatgamedota.liveboardviewer", "Live Board Viewer", "0.3.3")]
 public class LiveBoardViewer : BaseUnityPlugin
 {
     public static WebSocketConnection wsConnection;
