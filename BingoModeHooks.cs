@@ -11,6 +11,7 @@ public static class BingoModeHooks
 {
     public static int completedGoals = 0;
     public static string cachedTime = "";
+    public static int deaths = 0;
 
     public static Type? _steamTestType;
     public static Type? SteamTestType => _steamTestType ??= AppDomain.CurrentDomain.GetAssemblies()
@@ -54,7 +55,8 @@ public static class BingoModeHooks
                name + ";;" +
                team + ";;" +
                cachedTime + ";;" +
-               completedGoals;
+               completedGoals + ";;" +
+               deaths;
     }
 
     public static void SendBoardAsync(string payload)
@@ -94,6 +96,25 @@ public static class BingoModeHooks
 
         new Hook(typeof(BingoMode.BingoData).GetMethod("InitializeBingo", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), On_InitializeBingo);
         // new Hook(typeof(BingoMode.BingoBoard).GetMethod("InterpretBingoState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), On_InterpretBingoState);
+
+        new Hook(typeof(RainWorldGame).GetMethod("GoToDeathScreen", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), On_GoToDeathScreen);
+        new Hook(typeof(RainWorldGame).GetMethod("Win", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), On_Win);
+    }
+
+    public static void On_Win(Action<RainWorldGame, bool, bool> orig, RainWorldGame self, bool malnourished, bool fromWarpPoint)
+    {
+        SpeedRunTimer.CampaignTimeTracker campaignTimeTracker = SpeedRunTimer.GetCampaignTimeTracker(self.GetStorySession.saveStateNumber);
+        cachedTime = campaignTimeTracker?.TotalFreeTimeSpan.GetIGTFormat(true);
+        orig(self, malnourished, fromWarpPoint);
+    }
+
+    public static void On_GoToDeathScreen(Action<RainWorldGame> orig, RainWorldGame self)
+    {
+        SpeedRunTimer.CampaignTimeTracker campaignTimeTracker = SpeedRunTimer.GetCampaignTimeTracker(self.GetStorySession.saveStateNumber);
+        cachedTime = campaignTimeTracker?.TotalFreeTimeSpan.GetIGTFormat(true);
+        deaths++;
+        LiveBoardViewer.logger.LogInfo($"Death occurred. Total deaths: {deaths}. Cached time: {cachedTime}");
+        orig(self);
     }
 
     public static void On_ChallengeStateChangeToHost(Action<Expedition.Challenge, bool> orig, Expedition.Challenge ch, bool failed)
@@ -170,7 +191,8 @@ public static class BingoModeHooks
         if (!LiveBoardViewer.game.progression.IsThereASavedGame(Expedition.ExpeditionData.slugcatPlayer))
         {
             completedGoals = 0;
-            LiveBoardViewer.logger.LogInfo($"Completed goals reset: {completedGoals}");
+            deaths = 0;
+            LiveBoardViewer.logger.LogInfo($"Completed goals reset: {completedGoals} {deaths}");
         }
         orig();
     }
@@ -214,7 +236,7 @@ public static class BingoModeHooks
             isHost = (ulong?)GetSteamID64?.Invoke(selfIdentity, null) == BingoMode.BingoSteamworks.SteamFinal.GetHost().GetSteamID64();
         }
 
-        if (!isSelf && !isHost)
+        if (!isSelf && !isHost && data[0] != 'H')
         {
             string payload = BuildBoardPayload();
             SendBoardAsync(payload);

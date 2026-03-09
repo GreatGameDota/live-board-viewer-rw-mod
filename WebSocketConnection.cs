@@ -74,7 +74,10 @@ public class WebSocketConnection : IDisposable
         catch (Exception ex)
         {
             LiveBoardViewer.logger.LogInfo($"Failed to send data via WebSocket: {ex.Message}");
-            await DisconnectAsync();
+            if (isConnected)
+            {
+                await DisconnectAsync();
+            }
             // throw;
         }
     }
