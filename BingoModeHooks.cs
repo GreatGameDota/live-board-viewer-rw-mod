@@ -11,7 +11,7 @@ public static class BingoModeHooks
 {
     public static int completedGoals = 0;
     public static string cachedTime = "";
-    public static int deaths = 0;
+    public static List<string> deaths = [];
 
     public static Type? _steamTestType;
     public static Type? SteamTestType => _steamTestType ??= AppDomain.CurrentDomain.GetAssemblies()
@@ -56,7 +56,7 @@ public static class BingoModeHooks
                team + ";;" +
                cachedTime + ";;" +
                completedGoals + ";;" +
-               deaths;
+               string.Join(",", deaths);
     }
 
     public static void SendBoardAsync(string payload)
@@ -112,8 +112,8 @@ public static class BingoModeHooks
     {
         SpeedRunTimer.CampaignTimeTracker campaignTimeTracker = SpeedRunTimer.GetCampaignTimeTracker(self.GetStorySession.saveStateNumber);
         cachedTime = campaignTimeTracker?.TotalFreeTimeSpan.GetIGTFormat(true);
-        deaths++;
-        LiveBoardViewer.logger.LogInfo($"Death occurred. Total deaths: {deaths}. Cached time: {cachedTime}");
+        deaths.Add(self.world.region.name);
+        LiveBoardViewer.logger.LogInfo($"Death occurred. Total deaths: {deaths}. Cached time: {cachedTime} {self.world.region.name}");
         orig(self);
     }
 
@@ -191,8 +191,8 @@ public static class BingoModeHooks
         if (!LiveBoardViewer.game.progression.IsThereASavedGame(Expedition.ExpeditionData.slugcatPlayer))
         {
             completedGoals = 0;
-            deaths = 0;
-            LiveBoardViewer.logger.LogInfo($"Completed goals reset: {completedGoals} {deaths}");
+            deaths.Clear();
+            LiveBoardViewer.logger.LogInfo($"Completed goals reset: {completedGoals} [{string.Join(",", deaths)}]");
         }
         orig();
     }
