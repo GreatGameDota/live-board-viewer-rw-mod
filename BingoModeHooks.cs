@@ -12,6 +12,7 @@ public static class BingoModeHooks
     public static int completedGoals = 0;
     public static string cachedTime = "";
     public static List<string> deaths = [];
+    public static List<string> deathTime = [];
 
     public static Type? _steamTestType;
     public static Type? SteamTestType => _steamTestType ??= AppDomain.CurrentDomain.GetAssemblies()
@@ -112,8 +113,12 @@ public static class BingoModeHooks
     {
         SpeedRunTimer.CampaignTimeTracker campaignTimeTracker = SpeedRunTimer.GetCampaignTimeTracker(self.GetStorySession.saveStateNumber);
         cachedTime = campaignTimeTracker?.TotalFreeTimeSpan.GetIGTFormat(true);
-        deaths.Add(self.world.region.name);
-        LiveBoardViewer.logger.LogInfo($"Death occurred. Total deaths: {deaths}. Cached time: {cachedTime} {self.world.region.name}");
+        if (deathTime.Count == 0 || deathTime[deathTime.Count - 1] != cachedTime)
+        {
+            deaths.Add(self.world.region.name);
+            deathTime.Add(cachedTime);
+        }
+        LiveBoardViewer.logger.LogInfo($"Death occurred. Total deaths: {deaths.Count}. Cached time: {cachedTime} {self.world.region.name}");
         orig(self);
     }
 
@@ -192,6 +197,7 @@ public static class BingoModeHooks
         {
             completedGoals = 0;
             deaths.Clear();
+            deathTime.Clear();
             LiveBoardViewer.logger.LogInfo($"Completed goals reset: {completedGoals} [{string.Join(",", deaths)}]");
         }
         orig();
