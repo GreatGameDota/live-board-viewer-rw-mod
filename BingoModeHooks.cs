@@ -93,7 +93,7 @@ public static class BingoModeHooks
         }
 
         new Hook(typeof(BingoMode.BingoChallenges.BingoChallenge).GetMethod("OnChallengeCompleted", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), On_OnChallengeCompleted);
-        new Hook(typeof(BingoMode.BingoChallenges.BingoChallenge).GetMethod("OnChallengeFailed", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), On_OnChallengeFailed);
+        // new Hook(typeof(BingoMode.BingoChallenges.BingoChallenge).GetMethod("OnChallengeFailed", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), On_OnChallengeFailed);
 
         new Hook(typeof(BingoMode.BingoData).GetMethod("InitializeBingo", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), On_InitializeBingo);
         // new Hook(typeof(BingoMode.BingoBoard).GetMethod("InterpretBingoState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), On_InterpretBingoState);
@@ -124,7 +124,7 @@ public static class BingoModeHooks
 
     public static void On_ChallengeStateChangeToHost(Action<Expedition.Challenge, bool> orig, Expedition.Challenge ch, bool failed)
     {
-        if (!failed)
+        if (!failed && !ch.completed)
             LiveBoardViewer.logger.LogInfo($"Completed goals: {++completedGoals}");
         orig(ch, failed);
     }
@@ -183,7 +183,7 @@ public static class BingoModeHooks
                 BingoMode.BingoChallenges.BingoChallenge bingoChallenge = BingoMode.BingoHooks.GlobalBoard.challengeGrid[num, num2] as BingoMode.BingoChallenges.BingoChallenge;
                 if (!bingoChallenge.TeamsCompleted.Any(x => x) && num3 == (int)team)
                 {
-                    completedGoals--;
+                    LiveBoardViewer.logger.LogInfo($"Team completed a goal: {--completedGoals}");
                 }
             }
         }
@@ -196,6 +196,7 @@ public static class BingoModeHooks
         if (!LiveBoardViewer.game.progression.IsThereASavedGame(Expedition.ExpeditionData.slugcatPlayer))
         {
             completedGoals = 0;
+            cachedTime = "";
             deaths.Clear();
             deathTime.Clear();
             LiveBoardViewer.logger.LogInfo($"Completed goals reset: {completedGoals} [{string.Join(",", deaths)}]");
@@ -214,7 +215,7 @@ public static class BingoModeHooks
             isHost = (ulong?)GetSteamID64?.Invoke(selfIdentity, null) == BingoMode.BingoSteamworks.SteamFinal.GetHost().GetSteamID64();
         }
 
-        if ((int)_team == team && isHost)
+        if ((int)_team == team && isHost && !string.IsNullOrEmpty(cachedTime) && !cachedTime.Equals("000h:00m:00s:000ms") && !self.completed)
             LiveBoardViewer.logger.LogInfo($"Completed goals: {++completedGoals}");
         orig(self, team);
     }
@@ -242,7 +243,7 @@ public static class BingoModeHooks
             isHost = (ulong?)GetSteamID64?.Invoke(selfIdentity, null) == BingoMode.BingoSteamworks.SteamFinal.GetHost().GetSteamID64();
         }
 
-        if (!isSelf && !isHost && data[0] != 'H')
+        if (!isSelf && !isHost && data[0] != 'H' && data[0] != '%')
         {
             string payload = BuildBoardPayload();
             SendBoardAsync(payload);
