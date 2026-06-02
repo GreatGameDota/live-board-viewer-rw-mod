@@ -4,6 +4,9 @@ using Steamworks;
 using MoreSlugcats;
 using System.Text.RegularExpressions;
 using System.Globalization;
+using MonoMod.Cil;
+using Mono.Cecil.Cil;
+using Watcher;
 
 namespace LiveBoardViewer;
 
@@ -13,6 +16,11 @@ public static class BingoModeHooks
     public static string cachedTime = "";
     public static List<string> deaths = [];
     public static List<string> deathTime = [];
+    public static List<string> savedTames = [];
+    public static List<string> tames = [];
+    public static List<string> regions = [];
+    public static string startingShelter = "";
+    public static bool isRandomShelter = true;
 
     public static Type? _steamTestType;
     public static Type? SteamTestType => _steamTestType ??= AppDomain.CurrentDomain.GetAssemblies()
@@ -51,13 +59,25 @@ public static class BingoModeHooks
             cachedTime = campaignTimeTracker?.TotalFreeTimeSpan.GetIGTFormat(true);
         }
 
+        if (string.IsNullOrEmpty(startingShelter))
+        {
+            startingShelter = BingoMode.BingoHooks.GlobalBoard.ToString().Split(';')[2];
+            if (startingShelter != "random" && !regions.Contains(startingShelter.Split('_')[0]))
+                regions.Add(startingShelter.Split('_')[0]);
+        }
+
         return BingoMode.BingoHooks.GlobalBoard.ToString() + ";;" +
                state.Replace('3', '1') + ";;" +
                name + ";;" +
                team + ";;" +
                cachedTime + ";;" +
                completedGoals + ";;" +
-               string.Join(",", deaths);
+               string.Join(",", deaths) + ";;" +
+               string.Join(",", savedTames) + ";;" +
+               string.Join(",", regions) + ";;" +
+               startingShelter + ";;" +
+               (isRandomShelter ? "1" : "0") + ";;" +
+               (BingoMode.BingoData.BingoSaves.TryGetValue(Expedition.ExpeditionData.slugcatPlayer, out var save) && save.passageUsed ? "1" : "0");
     }
 
     public static void SendBoardAsync(string payload)
@@ -75,6 +95,55 @@ public static class BingoModeHooks
                 LiveBoardViewer.logger.LogError($"WebSocket send failed: {ex.Message}");
             }
         });
+    }
+
+    // Taken from BingoMode ChallengeHooks
+    public static void FriendTracker_Update(ILContext il)
+    {
+        ILCursor c = new(il);
+        if (c.TryGotoNext(x => x.MatchStfld<FriendTracker>("friendRel")))
+        {
+            c.Emit(OpCodes.Ldarg_0);
+            c.EmitDelegate<Action<FriendTracker>>((self) =>
+            {
+                string id = self.AI.creature.ID.ToString();
+                LiveBoardViewer.logger.LogInfo($"Friend tamed. ID: {id}, Creature: {self.AI.creature.creatureTemplate.name}");
+                foreach (var tame in tames)
+                {
+                    if (tame.Split('|').Last() == id)
+                        return;
+                }
+                foreach (var savedTame in savedTames)
+                {
+                    if (savedTame.Split('|').Last() == id)
+                        return;
+                }
+                tames.Add(self.AI.creature.creatureTemplate.name + "|" + id);
+            });
+        }
+        else LiveBoardViewer.logger.LogError("Uh oh, FriendTracker_Update il " + il);
+    }
+
+    // Taken from BingoMode ChallengeHooks
+    public static void Watcher_WarpPoint_ChangeState_EnterRegion(On.Watcher.WarpPoint.orig_ChangeState orig, WarpPoint self, WarpPoint.State state)
+    {
+        orig(self, state);
+        if (state == WarpPoint.State.SpawnItems)
+        {
+            if (!regions.Contains(self.room.world.name.ToUpperInvariant()))
+                regions.Add(self.room.world.name.ToUpperInvariant());
+        }
+    }
+
+    // Taken from BingoMode ChallengeHooks
+    public static void WorldLoader_EnterRegion(On.WorldLoader.orig_ctor_RainWorldGame_Name_Timeline_bool_string_Region_SetupValues orig, WorldLoader self, RainWorldGame game, SlugcatStats.Name playerCharacter, SlugcatStats.Timeline timelinePosition, bool singleRoomWorld, string worldName, Region region, RainWorldGame.SetupValues setupValues)
+    {
+        orig.Invoke(self, game, playerCharacter, timelinePosition, singleRoomWorld, worldName, region, setupValues);
+        if (game != null && game.world != null)
+        {
+            if (!regions.Contains(worldName))
+                regions.Add(worldName);
+        }
     }
 
     public static void Apply()
@@ -100,12 +169,19 @@ public static class BingoModeHooks
 
         new Hook(typeof(RainWorldGame).GetMethod("GoToDeathScreen", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), On_GoToDeathScreen);
         new Hook(typeof(RainWorldGame).GetMethod("Win", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), On_Win);
+
+        IL.FriendTracker.Update += FriendTracker_Update;
+        On.Watcher.WarpPoint.ChangeState += Watcher_WarpPoint_ChangeState_EnterRegion;
+        On.WorldLoader.ctor_RainWorldGame_Name_Timeline_bool_string_Region_SetupValues += WorldLoader_EnterRegion;
     }
 
     public static void On_Win(Action<RainWorldGame, bool, bool> orig, RainWorldGame self, bool malnourished, bool fromWarpPoint)
     {
         SpeedRunTimer.CampaignTimeTracker campaignTimeTracker = SpeedRunTimer.GetCampaignTimeTracker(self.GetStorySession.saveStateNumber);
         cachedTime = campaignTimeTracker?.TotalFreeTimeSpan.GetIGTFormat(true);
+        foreach (var tame in tames)
+            savedTames.Add(tame);
+        tames.Clear();
         orig(self, malnourished, fromWarpPoint);
     }
 
@@ -117,6 +193,7 @@ public static class BingoModeHooks
         {
             deaths.Add(self.world.region.name);
             deathTime.Add(cachedTime);
+            tames.Clear();
         }
         LiveBoardViewer.logger.LogInfo($"Death occurred. Total deaths: {deaths.Count}. Cached time: {cachedTime} {self.world.region.name}");
         orig(self);
@@ -129,43 +206,43 @@ public static class BingoModeHooks
         orig(ch, failed);
     }
 
-    public static void On_InterpretBingoState(Action<BingoMode.BingoBoard, string> orig, BingoMode.BingoBoard self, string state)
-    {
-        LiveBoardViewer.logger.LogInfo($"InterpretBingoState called.");
-        if (self.challengeGrid != null)
-        {
-            string[] array = Regex.Split(state, "<>");
-            int num = 0;
-            for (int i = 0; i < self.size; i++)
-            {
-                for (int j = 0; j < self.size; j++)
-                {
-                    if (self.challengeGrid[j, i] == null)
-                    {
-                        num++;
-                    }
-                    else
-                    {
-                        var team = GetSteamTestField("team");
-                        BingoMode.BingoChallenges.BingoChallenge bingoChallenge = self.challengeGrid[j, i] as BingoMode.BingoChallenges.BingoChallenge;
-                        string text = bingoChallenge.TeamsToString();
-                        string text2 = array[num++];
-                        if (text != text2)
-                        {
-                            for (int k = 0; k < text.Length; k++)
-                            {
-                                if (text2[k] == '1' && text[k] == '0' && (int)team == k)
-                                {
-                                    completedGoals--;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        orig(self, state);
-    }
+    // public static void On_InterpretBingoState(Action<BingoMode.BingoBoard, string> orig, BingoMode.BingoBoard self, string state)
+    // {
+    //     LiveBoardViewer.logger.LogInfo($"InterpretBingoState called.");
+    //     if (self.challengeGrid != null)
+    //     {
+    //         string[] array = Regex.Split(state, "<>");
+    //         int num = 0;
+    //         for (int i = 0; i < self.size; i++)
+    //         {
+    //             for (int j = 0; j < self.size; j++)
+    //             {
+    //                 if (self.challengeGrid[j, i] == null)
+    //                 {
+    //                     num++;
+    //                 }
+    //                 else
+    //                 {
+    //                     var team = GetSteamTestField("team");
+    //                     BingoMode.BingoChallenges.BingoChallenge bingoChallenge = self.challengeGrid[j, i] as BingoMode.BingoChallenges.BingoChallenge;
+    //                     string text = bingoChallenge.TeamsToString();
+    //                     string text2 = array[num++];
+    //                     if (text != text2)
+    //                     {
+    //                         for (int k = 0; k < text.Length; k++)
+    //                         {
+    //                             if (text2[k] == '1' && text[k] == '0' && (int)team == k)
+    //                             {
+    //                                 completedGoals--;
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     orig(self, state);
+    // }
 
     public static void On_InnerWorkings_MessageReceived(Action<string> orig, string _message)
     {
@@ -199,7 +276,12 @@ public static class BingoModeHooks
             cachedTime = "";
             deaths.Clear();
             deathTime.Clear();
-            LiveBoardViewer.logger.LogInfo($"Completed goals reset: {completedGoals} [{string.Join(",", deaths)}]");
+            tames.Clear();
+            savedTames.Clear();
+            regions.Clear();
+            startingShelter = "";
+            isRandomShelter = BingoMode.BingoData.BingoDen.ToLowerInvariant() == "random";
+            LiveBoardViewer.logger.LogInfo($"Completed goals reset: {completedGoals} [{string.Join(",", deaths)}] {BingoMode.BingoData.BingoDen.ToLowerInvariant()}");
         }
         orig();
     }
@@ -220,13 +302,13 @@ public static class BingoModeHooks
         orig(self, team);
     }
 
-    public static void On_OnChallengeFailed(Action<BingoMode.BingoChallenges.BingoChallenge, int> orig, BingoMode.BingoChallenges.BingoChallenge self, int team)
-    {
-        var _team = GetSteamTestField("team");
-        if (self.completed && (int)_team == team)
-            LiveBoardViewer.logger.LogInfo($"Goal failed: {--completedGoals}");
-        orig(self, team);
-    }
+    // public static void On_OnChallengeFailed(Action<BingoMode.BingoChallenges.BingoChallenge, int> orig, BingoMode.BingoChallenges.BingoChallenge self, int team)
+    // {
+    //     var _team = GetSteamTestField("team");
+    //     if (self.completed && (int)_team == team)
+    //         LiveBoardViewer.logger.LogInfo($"Goal failed: {--completedGoals}");
+    //     orig(self, team);
+    // }
 
     public static void On_InnerWorkings_SendMessage(Action<string, SteamNetworkingIdentity, bool> orig, string data, SteamNetworkingIdentity receiver, bool reliable = true)
     {
