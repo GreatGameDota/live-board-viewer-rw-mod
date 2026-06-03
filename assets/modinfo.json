@@ -1,7 +1,7 @@
 {
     "id": "greatgamedota.liveboardviewer",
     "name": "Live Bingo Board Viewer",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "authors": "GreatGameDota",
     "description": "Live Bingo Board Viewer for Bingo Mode",
     "requirements": [],

@@ -61,7 +61,8 @@ public static class BingoModeHooks
 
         if (string.IsNullOrEmpty(startingShelter))
         {
-            startingShelter = BingoMode.BingoHooks.GlobalBoard.ToString().Split(';')[2];
+            string[] board = BingoMode.BingoHooks.GlobalBoard.ToString().Split(';');
+            startingShelter = board.Length == 3 ? board[1] : board[2];
             if (startingShelter != "random" && !regions.Contains(startingShelter.Split('_')[0]))
                 regions.Add(startingShelter.Split('_')[0]);
         }
