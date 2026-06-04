@@ -20,7 +20,6 @@ public static class BingoModeHooks
     public static List<string> tames = [];
     public static List<string> regions = [];
     public static string startingShelter = "";
-    public static bool isRandomShelter = true;
 
     public static Type? _steamTestType;
     public static Type? SteamTestType => _steamTestType ??= AppDomain.CurrentDomain.GetAssemblies()
@@ -59,15 +58,18 @@ public static class BingoModeHooks
             cachedTime = campaignTimeTracker?.TotalFreeTimeSpan.GetIGTFormat(true);
         }
 
-        if (string.IsNullOrEmpty(startingShelter))
+        string boardString = BingoMode.BingoHooks.GlobalBoard.ToString();
+        string[] board = boardString.Split(';');
+        string shelter = board.Length == 3 ? board[1] : board[2];
+        if (shelter != "random")
         {
-            string[] board = BingoMode.BingoHooks.GlobalBoard.ToString().Split(';');
-            startingShelter = board.Length == 3 ? board[1] : board[2];
-            if (startingShelter != "random" && !regions.Contains(startingShelter.Split('_')[0]))
-                regions.Add(startingShelter.Split('_')[0]);
+            startingShelter = shelter[0] == 'r' || shelter[0] == 's' ? shelter.Substring(1) : shelter;
+            string region = startingShelter.Split('_')[0];
+            if (!regions.Contains(region))
+                regions.Add(region);
         }
 
-        return BingoMode.BingoHooks.GlobalBoard.ToString() + ";;" +
+        return boardString + ";;" +
                state.Replace('3', '1') + ";;" +
                name + ";;" +
                team + ";;" +
@@ -77,7 +79,7 @@ public static class BingoModeHooks
                string.Join(",", savedTames) + ";;" +
                string.Join(",", regions) + ";;" +
                startingShelter + ";;" +
-               (isRandomShelter ? "1" : "0") + ";;" +
+               (shelter != "random" && shelter[0] == 'r' ? "1" : "0") + ";;" +
                (BingoMode.BingoData.BingoSaves.TryGetValue(Expedition.ExpeditionData.slugcatPlayer, out var save) && save.passageUsed ? "1" : "0");
     }
 
@@ -281,7 +283,6 @@ public static class BingoModeHooks
             savedTames.Clear();
             regions.Clear();
             startingShelter = "";
-            isRandomShelter = BingoMode.BingoData.BingoDen.ToLowerInvariant() == "random";
             LiveBoardViewer.logger.LogInfo($"Completed goals reset: {completedGoals} [{string.Join(",", deaths)}] {BingoMode.BingoData.BingoDen.ToLowerInvariant()}");
         }
         orig();
