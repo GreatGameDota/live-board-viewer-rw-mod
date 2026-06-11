@@ -143,7 +143,11 @@ public static class BingoModeHooks
     public static void WorldLoader_EnterRegion(On.WorldLoader.orig_ctor_RainWorldGame_Name_Timeline_bool_string_Region_SetupValues orig, WorldLoader self, RainWorldGame game, SlugcatStats.Name playerCharacter, SlugcatStats.Timeline timelinePosition, bool singleRoomWorld, string worldName, Region region, RainWorldGame.SetupValues setupValues)
     {
         orig.Invoke(self, game, playerCharacter, timelinePosition, singleRoomWorld, worldName, region, setupValues);
-        if (game != null && game.world != null && BingoMode.BingoData.GetBingoModifier() != BingoMode.BingoData.BingoModifier.WatcherMode && ExpeditionData.slugcatPlayer != WatcherEnums.SlugcatStatsName.Watcher)
+        string boardString = BingoMode.BingoHooks.GlobalBoard.ToString(); // Must use board string since GetBingoModifier() isn't present in old versions
+        string[] board = boardString.Split(';');
+        if (game != null && game.world != null
+            && int.TryParse(board[1], out int result) && result != 1
+            && ExpeditionData.slugcatPlayer != WatcherEnums.SlugcatStatsName.Watcher)
         {
             if (!regions.Contains(worldName))
                 regions.Add(worldName);
