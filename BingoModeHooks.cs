@@ -336,7 +336,7 @@ public static class BingoModeHooks
             isHost = (ulong?)GetSteamID64?.Invoke(selfIdentity, null) == BingoMode.BingoSteamworks.SteamFinal.GetHost().GetSteamID64();
         }
 
-        if (!isSelf && !isHost && data[0] != 'H' && data[0] != '%')
+        if (!isSelf && !isHost && data[0] != 'H' && data[0] != '%' && data[0] != 'O')
         {
             string payload = BuildBoardPayload();
             SendBoardAsync(payload);
